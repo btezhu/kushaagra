@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source "$SCRIPT_DIR/utils.sh"
+
 set -x
 
 find / -perm /4000 2>/dev/null
