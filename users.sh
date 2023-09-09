@@ -46,6 +46,7 @@ echo_command() {
 echo_todo() {
 	if [ -n "$users_commands_file_path" ]; then
 		echo "TODO:" $1
+		echo "# TODO:" $1 >> "$users_commands_file_path"
 	else
 		echo "# TODO:" $1
 	fi
