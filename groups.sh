@@ -66,8 +66,15 @@ for group in "${groups_in_group[@]}"; do
 	if [ "$encrypted_password" != "x" ]; then
 		echo_todo "Ensure group $groupname has an 'x' in /etc/group"
 	fi
+	if [ "$groupname" == "shadow" ]; then
+		if [ -n "$users" ]; then
+			for user in "${users[@]}"; do
+				echo_command "gpasswd -d $user shadow"
+			done 
+		fi
+	fi
 	IFS=$' \t\n'
-	
+
 	is_in_file=0
 	if [ "$groupname" == "sudo" ]; then
 		is_in_file=1
