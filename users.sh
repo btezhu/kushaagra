@@ -16,6 +16,7 @@ users_commands_file_path="$2"
 
 if [ -n "$users_commands_file_path" ]; then
 	echo "#!/bin/bash" > "$users_commands_file_path"
+	echo >> "$users_commands_file_path"
 fi
 
 # read users from provided file
@@ -50,6 +51,9 @@ echo_todo() {
 	fi
 }
 
+echo_command "passwd -l root"
+echo_command
+
 for user in "${users_in_passwd[@]}"; do
     IFS=":"
     read username encrypted_password user_id group_id user_id_info home_directory shell <<< "$user"
@@ -68,22 +72,29 @@ for user in "${users_in_passwd[@]}"; do
         echo_todo "Ensure user $username has an 'x' in /etc/passwd"
     fi
 	is_in_file=0
-	for user in "${users_in_file[@]}"; do
-		if [[ "$username" == "$user" ]]; then
-			is_in_file=1
-		fi
-	done
+	if [ "$username" == "root" ]; then
+		is_in_file=1
+	else
+		for user in "${users_in_file[@]}"; do
+			if [[ "$username" == "$user" ]]; then
+				is_in_file=1
+			fi
+		done
+	fi
 	if [ "$is_in_file" -eq 0 ]; then
 		echo_command "deluser --remove-all-files $username"
 	fi
-	users_encountered["$username"]="$username" # any nonempty string
+	users_encountered["$username"]="$user_id"
 done
 
-# to seperate deleting users from adding them
 echo_command
 
 for user in "${users_in_file[@]}"; do
 	if [ -z "${users_encountered[$user]}" ]; then
 		echo_command "adduser $user"
+	else
+		if [ "${users_encountered[$user]}" -lt 1000 ]; then
+			echo_todo "Set user_id for user $user to value >= 1000"
+		fi
 	fi
 done
