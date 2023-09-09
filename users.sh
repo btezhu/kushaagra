@@ -33,7 +33,7 @@ while IFS= read -r line; do
 	if [[ "$line" != "#"* ]]; then # if the line doesn't start with a comment
 		users_in_passwd+=("$line")
 	fi
-done < /etc/passwd
+done < <(sort -t: -k3 -n /etc/passwd)
 
 echo_command() {
 	if [ -n "$users_commands_file_path" ]; then
@@ -55,6 +55,7 @@ echo_todo() {
 echo_command "passwd -l root"
 echo_command
 
+done_sys=0
 for user in "${users_in_passwd[@]}"; do
 	IFS=":"
 	read username encrypted_password user_id group_id user_id_info home_directory shell <<< "$user"
@@ -67,6 +68,12 @@ for user in "${users_in_passwd[@]}"; do
 		fi
 		if [ "$group_id" == "0" ] && [ "$username" != "root" ]; then
 			echo_todo "Set user_id for user $username to nonzero value"
+		fi
+	else
+		if [ "$done_sys" -eq 0 ]; then
+			done_sys=1
+			echo_command
+			echo_command "# User accounts"
 		fi
 	fi
 	if [ "$encrypted_password" != "x" ]; then
