@@ -68,9 +68,11 @@ for group in "${groups_in_group[@]}"; do
 	fi
 	if [ "$groupname" == "shadow" ]; then
 		if [ -n "$users" ]; then
+			echo_command
 			for user in "${users[@]}"; do
 				echo_command "gpasswd -d $user shadow"
 			done 
+			echo_command
 		fi
 	fi
 	IFS=$' \t\n'
