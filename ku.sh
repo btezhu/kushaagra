@@ -60,7 +60,7 @@ do_users() {
 				echo_todo "Set user_id for user $username to nonzero value"
 			fi
 			if [ "$group_id" == "0" ] && [ "$username" != "root" ]; then
-				echo_todo "Set user_id for user $username to nonzero value"
+				echo_todo "Set group_id for user $username to nonzero value"
 			fi
 		else
 			if [ "$done_sys" -eq 0 ]; then
@@ -102,8 +102,114 @@ do_users() {
 }
 
 do_groups() {
-	echo "TODO: Implement do_groups()"
-	exit 1
+	groups_file_path="$1"
+	commands_file_path="$2"
+	if [ -n "$commands_file_path" ]; then
+		echo "#!/bin/bash" > "$commands_file_path"
+		echo >> "$commands_file_path"
+	fi
+
+	# read groups from provided file
+	groups_in_file=()
+	declare -A groups_encountered
+	declare -A users_in_group
+	while IFS= read -r line; do
+		read groupname users <<< "$line"
+		groups_in_file+=("$groupname")
+		groups_encountered["$groupname"]=""
+		users_in_group["$groupname"]="$users"
+	done < <(grep . "${groups_file_path}")
+
+	# read groups from /etc/group
+	groups_in_group=()
+	while IFS= read -r line; do
+		if [[ "$line" != "#"* ]]; then # if the line doesn't start with a comment
+			groups_in_group+=("$line")
+		fi
+	done < /etc/group
+
+	for group in "${groups_in_group[@]}"; do
+		IFS=":"
+		read groupname encrypted_password group_id users <<< "$group"
+		if [ "$group_id" == "0" ] && [ "$groupname" != "root" ]; then
+			echo_todo "Set group_id for group $groupname to nonzero value"
+		fi
+		if [ "$encrypted_password" != "x" ]; then
+			echo_todo "Ensure group $groupname has an 'x' in /etc/group"
+		fi
+		if [ "$groupname" == "shadow" ]; then
+			if [ -n "$users" ]; then
+				echo_command
+				IFS=","
+				for user in "${users[@]}"; do
+					echo_command "gpasswd -d $user shadow"
+				done 
+				echo_command
+			fi
+		fi
+		IFS=$' \t\n'
+
+		is_in_file=0
+		if [ "$groupname" == "sudo" ]; then
+			is_in_file=1
+		else
+			for group in "${groups_in_file[@]}"; do
+				if [[ "$groupname" == "$group" ]]; then
+					is_in_file=1
+					IFS=','
+					read -a users_found <<< "$users"
+					read -ra users <<< "${users_in_group[$group]}"
+					declare -A users_encountered
+					echo_command
+					echo_command "# Group $group"
+
+					for user in "${users[@]}"; do
+						users_encountered["$user"]=""
+					done
+
+					for user_found in "${users_found[@]}"; do
+						is_in_group=0
+						for user in "${users[@]}"; do
+							if [[ "$user_found" == "$user" ]]; then
+								is_in_group=1
+							fi
+						done
+						if [ "$is_in_group" -eq 0 ]; then
+							echo_command "gpasswd -d $user_found $group"
+						fi
+						users_encountered["$user_found"]="encountered"
+					done
+					for user in "${users[@]}"; do
+						if [ -z "${users_encountered[$user]}" ]; then
+							echo_command "usermod -aG $group $user"
+						fi
+					done
+					echo_command
+					IFS=$' \t\n'
+				fi
+			done
+		fi
+
+		if [ "$is_in_file" -eq 0 ] && [ "$group_id" -gt "999" ]; then
+			echo_command "groupdel $groupname"
+		fi
+		groups_encountered["$groupname"]="encountered" # any nonempty string
+	done
+
+	echo_command
+
+	# add non-encountered groups
+	for group in "${groups_in_file[@]}"; do
+		if [ -z "${groups_encountered[$group]}" ]; then
+			echo_command "addgroup $group"
+			IFS=" "
+			read -ra users <<< "${users_in_group[$group]}"
+			for user in "${users[@]}"; do
+				echo_command "usermod -aG $group $user"
+			done
+			IFS=$' \t\n'
+		fi
+	done
 }
 
 usage() {
@@ -138,9 +244,9 @@ if [[ "$command" == "users" ]]; then
 		exit 1
 	fi
 	do_users $2 $3
-elif [[ "$command" == " groups" ]]; then
+elif [[ "$command" == "groups" ]]; then
 	if [[ $# -lt 2 ]]; then
-		echo "No users file provided."
+		echo "No groups file provided."
 		exit 1
 	elif [[ $# -gt 3 ]]; then
 		echo "Too many arguments provided"
@@ -151,4 +257,6 @@ elif [[ "$command" == " groups" ]]; then
 		exit 1
 	fi
 	do_groups $2 $3
+else 
+	echo "Unknown command"
 fi
