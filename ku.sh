@@ -325,7 +325,6 @@ elif [[ "$command" == "update" ]]; then
 	apt-get update
 	apt-get upgrade
 	apt-get dist-upgrade
-
-else 
+else
 	echo "Unknown command '$command'"
 fi
